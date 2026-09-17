@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useProducts } from "@/hooks/useProducts";
+import { useEffect, useMemo, useState } from "react";
 import { Filters } from "@/components/Filters";
 import { ProductGrid } from "@/components/ProductGrid";
 import { ProductModal } from "@/components/ProductModal";
 import { Product } from "@/types/product";
+import { ErrorAlert } from "@/components/error-alert";
+import { useProducts } from "@/hooks/useProducts";
 
 export default function HomePage() {
   const { products, loading, error } = useProducts();
@@ -13,24 +14,37 @@ export default function HomePage() {
   const [category, setCategory] = useState("all");
   const [selected, setSelected] = useState<Product | null>(null);
 
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loading && products.length > 0) {
+      setLastUpdated(new Date().toLocaleTimeString());
+    }
+  }, [loading, products]);
+
   const categories = useMemo(() => {
     const unique = new Set(products.map((p) => p.category));
     return ["all", ...Array.from(unique)];
   }, [products]);
 
-  const visibleProducts = products.filter((product) => {
-    if (category !== "all") {
-      return product.category === category;
-    }
-    return product.title.includes(search);
-  });
+  const visibleProducts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return products.filter((product) => {
+      const matchesCategory =
+        category === "all" || product.category === category;
+      const matchesSearch =
+        product.title.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query);
+      return matchesCategory && matchesSearch;
+    });
+  }, [products, category, search]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6">
         <h1 className="text-3xl font-bold">Product Explorer</h1>
         <p className="text-sm text-slate-500">
-          Last updated at {new Date().toLocaleTimeString()}
+          Last updated at {lastUpdated ? lastUpdated : "loading..."}
         </p>
       </header>
 
@@ -42,14 +56,18 @@ export default function HomePage() {
         onCategoryChange={setCategory}
       />
 
-      {loading && <p className="mt-8 text-slate-500">Loading products…</p>}
+      {error && (
+        <ErrorAlert
+          className="mt-8"
+          message={error || "An unexpected error occurred."}
+        />
+      )}
 
-      {/*
-        TODO(candidate): the hook already exposes `error`, but nothing renders it.
-        Show a helpful error state to the user when the request fails.
-      */}
-
-      <ProductGrid products={visibleProducts} onSelect={setSelected} />
+      <ProductGrid
+        loading={loading}
+        products={visibleProducts}
+        onSelect={setSelected}
+      />
 
       <ProductModal product={selected} onClose={() => setSelected(null)} />
     </main>
