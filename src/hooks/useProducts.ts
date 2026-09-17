@@ -40,7 +40,7 @@ export function useProducts() {
     return () => {
       cancelled = true;
     };
-  }, [products]);
+  }, []);
 
   return { products, loading, error };
 }
